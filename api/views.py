@@ -97,12 +97,14 @@ class RolesView(APIView):
         
         return HttpResponse(ret)
 
+'''
+# 方法一 Serializer
 class UserInfoSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()   
     user_type = serializers.IntegerField()   # 原始写法，显示组id 1，2
     xxx = serializers.CharField(source= "user_type")  # 自定义字段名称
-    ooo = serializers.CharField(source= "get_user_type_display")  # 自定义字段名称和显示对应的级别  普通用户  VIP
+    ooo = serializers.CharField(source= "get_user_type_display")  # 自定义字段名称和显示对应的级别  普通用户  VIP  可执行自动加括号
     gp_id = serializers.CharField(source= "group.id")  # 获取组id  
     gp_title = serializers.CharField(source= "group.title")  # 获取组title
     # rls = serializers.CharField(source= "role.all")  # 获取角色
@@ -122,7 +124,10 @@ class UserInfoSerializer(serializers.Serializer):
         for item in role_obj_list:
             ret.append({'id':item.id, 'title':item.title})
         return ret
+'''
 
+'''
+# 方法二 ModelSerializer
 class UserInfoSerializer(serializers.ModelSerializer):
     
     xxx = serializers.CharField(source= "user_type")  # 自定义字段名称
@@ -134,8 +139,10 @@ class UserInfoSerializer(serializers.ModelSerializer):
         # fields = '__all__'    # 获取所有得字段
         
         fields = ['id', 'username', 'password', 'xxx', 'ooo', 'gp_title']
-        
-# 方法三        
+'''
+
+'''       
+# 方法三  自定义类  
 class MyField(serializers.CharField):
     
     def to_representation(self,value):
@@ -152,15 +159,82 @@ class UserInfoSerializer(serializers.ModelSerializer):
         # fields = '__all__'    # 获取所有得字段
         
         fields = ['id', 'username', 'password', 'x1']
+'''
+'''
+# 方法四 自动系列化连表
+class UserInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.UserInfo
+        fields = '__all__'    # 获取所有得字段s
+        depth = 0       # 深度，深度越深，效率越低   官方建议0 - 10，最好3，4    0为数据库单表得内容，1为链表数据
+'''
+
+# 返回数据自带url
+class UserInfoSerializer(serializers.ModelSerializer):
+    group  = serializers.HyperlinkedIdentityField(view_name='group', lookup_field='group_id', lookup_url_kwarg='pk')
+    class Meta:
+        model = models.UserInfo
+        # fields = '__all__'    # 获取所有得字段s
+        fields = ['id', 'username', 'password', 'group']
+        depth = 0       # 深度，深度越深，效率越低   官方建议0 - 10，最好3，4    0为数据库单表得内容，1为链表数据
+
 
 class UserInfoView(APIView):
     def get(self, request, *aargs, **kwargs):
         
         userinfo = models.UserInfo.objects.all()
         
-        ser = UserInfoSerializer(instance=userinfo, many=True)  # many=True  多条数据，单挑数据去掉或改为False
+        ser = UserInfoSerializer(instance=userinfo, many=True, context={'request': request})  # many=True  多条数据，单挑数据去掉或改为False
         
         ret = json.dumps(ser.data, ensure_ascii=False)
         
         return HttpResponse(ret)
+    
+
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.UserGroup
+        fields = '__all__'
+
+class GroupView(APIView):
+    def get(self, request, *aargs, **kwargs):
+        pk = kwargs.get('pk')
+        obj = models.UserGroup.objects.filter(id=pk).first()
+        ser = GroupSerializer(instance=obj, many= False)
+        ret = json.dumps(ser.data, ensure_ascii=False)
+        return HttpResponse(ret)
         
+        
+# 序列器验证数据规则
+# 简单验证
+'''
+class UserGroupSerializer(serializers.Serializer):
+    name = serializers.CharField(error_messages={'required': '名称不能为空'})
+'''
+
+# 自定义规则
+class XXValidator(object):
+    def __init__(self, base):
+        self.base = base
+    
+    def __call__(self, value):
+        if not value.startswith(self.base):
+            message = '名字必须以 %s 开头' % self.base
+            raise serializers.ValidationError(message)
+
+class UserGroupSerializer(serializers.Serializer):
+    name = serializers.CharField(validators={XXValidator('A')})
+
+class UserGroupView(APIView):
+    def post(self, request, *aargs, **kwargs):
+        print(request.data)
+        
+        ser = UserGroupSerializer(data= request.data)
+        
+        if ser.is_valid():
+            print(ser.validated_data)
+            print(ser.validated_data['name'])
+        else:
+            print('error' ,ser.errors)
+        
+        return HttpResponse('验证提交数据')
