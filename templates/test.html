@@ -1,0 +1,33 @@
+<form action="POST"></form>
+
+
+$.ajax({
+    url:   ,
+    type: 'POST',
+    data: { name: alex, age: 18, gender: 男 }    # 内部自动转换为 name=alex&age=18&gender=男
+})
+
+
+$.ajax({
+    url:   ,
+    type: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    }
+    data: { name: alex, age: 18, gender: 男 }    # 内部自动转换为 name=alex&age=18&gender=男
+})
+
+# body有值，POST无值
+
+$.ajax({
+    url:   ,
+    type: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    }
+    data: JSON.stringfy({ name: alex, age: 18, gender: 男 })    # 内部自动转换为 name=alex&age=18&gender=男
+})
+
+# body有值，POST无值
+# json.loads(request.body) 进行转换成json数据
+
